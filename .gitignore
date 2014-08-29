@@ -16,6 +16,9 @@ gen/
 .gradle/
 build/
 
+#project files from Adnroid studio
+.idea
+
 #Local configuration files (sdk path, etc)
 local.properties
 
