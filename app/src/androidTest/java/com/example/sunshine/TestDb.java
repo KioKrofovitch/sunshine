@@ -3,12 +3,14 @@ package com.example.sunshine;
 import android.content.ContentValues;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
+import android.net.Uri;
 import android.test.AndroidTestCase;
 import android.util.Log;
 
-import com.example.sunshine.data.WeatherDbHelper;
-import com.example.sunshine.data.WeatherContract.WeatherEntry;
+import com.example.sunshine.data.WeatherContract;
 import com.example.sunshine.data.WeatherContract.LocationEntry;
+import com.example.sunshine.data.WeatherContract.WeatherEntry;
+import com.example.sunshine.data.WeatherDbHelper;
 
 import java.util.Map;
 import java.util.Set;
@@ -16,6 +18,7 @@ import java.util.Set;
 public class TestDb extends AndroidTestCase{
 
     public static final String LOG_TAG = TestDb.class.getSimpleName();
+
 
     public void testCreateDb() throws Throwable {
         mContext.deleteDatabase(WeatherDbHelper.DATABASE_NAME);
@@ -74,6 +77,42 @@ public class TestDb extends AndroidTestCase{
         );
 
         validateCursor(weatherCursor, weatherValues);
+        weatherCursor.close();
+
+// Get the joined Weather and Location data
+        weatherCursor = mContext.getContentResolver().query(
+                WeatherEntry.buildWeatherLocation(TestProvider.TEST_CITY_LOCATION),
+                null, // leaving "columns" null just returns all the columns.
+                null, // cols for "where" clause
+                null, // values for "where" clause
+                null // sort order
+        );
+        TestDb.validateCursor(weatherCursor, weatherValues);
+        weatherCursor.close();
+
+// Get the joined Weather and Location data with a start date
+        weatherCursor = mContext.getContentResolver().query(
+                WeatherEntry.buildWeatherLocationWithStartDate(
+                        TestProvider.TEST_CITY_LOCATION, TestProvider.TEST_DATE),
+                null, // leaving "columns" null just returns all the columns.
+                null, // cols for "where" clause
+                null, // values for "where" clause
+                null // sort order
+        );
+        TestDb.validateCursor(weatherCursor, weatherValues);
+        weatherCursor.close();
+
+        // Get the joined Weather data for a specific date
+        weatherCursor = mContext.getContentResolver().query(
+                WeatherEntry.buildWeatherLocationWithDate(TestProvider.TEST_CITY_LOCATION,
+                        TestProvider.TEST_DATE),
+                null,
+                null,
+                null,
+                null
+        );
+        TestDb.validateCursor(weatherCursor, weatherValues);
+        weatherCursor.close();
 
         dbHelper.close();
     }

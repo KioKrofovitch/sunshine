@@ -1,14 +1,16 @@
 package com.example.sunshine;
 
+import android.annotation.TargetApi;
+import android.content.ContentUris;
 import android.content.ContentValues;
 import android.database.Cursor;
-import android.database.sqlite.SQLiteDatabase;
+import android.net.Uri;
+import android.os.Build;
 import android.test.AndroidTestCase;
 import android.util.Log;
 
 import com.example.sunshine.data.WeatherContract.LocationEntry;
 import com.example.sunshine.data.WeatherContract.WeatherEntry;
-import com.example.sunshine.data.WeatherDbHelper;
 
 import java.util.Map;
 import java.util.Set;
@@ -17,9 +19,59 @@ public class TestProvider extends AndroidTestCase {
 
     public static final String LOG_TAG = TestProvider.class.getSimpleName();
 
-    public void testDeleteDb() throws Throwable {
-        mContext.deleteDatabase(WeatherDbHelper.DATABASE_NAME);
+
+    public static final String TEST_CITY_NAME = "Denver";
+    public static final String TEST_CITY_LOCATION = "80202";
+    public static final String TEST_DATE = "20141102";
+
+    // The target api annotation is needed for the call to keySet -- we wouldn't want
+// to use this in our app, but in a test it's fine to assume a higher target.
+    @TargetApi(Build.VERSION_CODES.HONEYCOMB)
+    void addAllContentValues(ContentValues destination, ContentValues source) {
+        for (String key : source.keySet()) {
+            destination.put(key, source.getAsString(key));
+        }
     }
+
+    // brings our database to an empty state
+    public void deleteAllRecords() {
+        mContext.getContentResolver().delete(
+                WeatherEntry.CONTENT_URI,
+                null,
+                null
+        );
+        mContext.getContentResolver().delete(
+                LocationEntry.CONTENT_URI,
+                null,
+                null
+        );
+
+        Cursor cursor = mContext.getContentResolver().query(
+                WeatherEntry.CONTENT_URI,
+                null,
+                null,
+                null,
+                null
+        );
+        assertEquals(0, cursor.getCount());
+        cursor.close();
+
+        cursor = mContext.getContentResolver().query(
+                LocationEntry.CONTENT_URI,
+                null,
+                null,
+                null,
+                null
+        );
+        assertEquals(0, cursor.getCount());
+        cursor.close();
+    }
+    // Since we want each test to start with a clean slate, run deleteAllRecords
+// in setUp (called by the test runner before each test).
+    public void setUp() {
+        deleteAllRecords();
+    }
+
 
     public void testGetType() {
         // content://com.example.android.sunshine.app/weather/
@@ -52,17 +104,11 @@ public class TestProvider extends AndroidTestCase {
         assertEquals(LocationEntry.CONTENT_ITEM_TYPE, type);
     }
 
-    public void testInsertReadDb() {
-
-        // If there's an error in those massive SQL table creation Strings,
-        // errors will be thrown here when you try to get a writable database.
-        WeatherDbHelper dbHelper = new WeatherDbHelper(mContext);
-        SQLiteDatabase db = dbHelper.getWritableDatabase();
-
+    public void testInsertReadProvider() {
         ContentValues testValues = createNorthPoleLocationValues();
 
-        long locationRowId;
-        locationRowId = db.insert(LocationEntry.TABLE_NAME, null, testValues);
+        Uri locationUri = mContext.getContentResolver().insert(LocationEntry.CONTENT_URI, testValues);
+        long locationRowId = ContentUris.parseId(locationUri);
 
         // Verify we got a row back.
         assertTrue(locationRowId != -1);
@@ -72,38 +118,71 @@ public class TestProvider extends AndroidTestCase {
         // the round trip.
 
         // A cursor is your primary interface to the query results.
-        Cursor cursor = db.query(
-                LocationEntry.TABLE_NAME,  // Table to Query
-                null, // all columns
-                null, // Columns for the "where" clause
-                null, // Values for the "where" clause
-                null, // columns to group by
-                null, // columns to filter by row groups
+        Cursor cursor = mContext.getContentResolver().query(
+                LocationEntry.CONTENT_URI,
+                null, // leaving "columns" null just returns all the columns.
+                null, // cols for "where" clause
+                null, // values for "where" clause
                 null // sort order
         );
 
-        validateCursor(cursor, testValues);
+        TestDb.validateCursor(cursor, testValues);
+
+// Now see if we can successfully query if we include the row id
+        cursor = mContext.getContentResolver().query(
+                LocationEntry.buildLocationUri(locationRowId),
+                null, // leaving "columns" null just returns all the columns.
+                null, // cols for "where" clause
+                null, // values for "where" clause
+                null // sort order
+        );
+
+        TestDb.validateCursor(cursor, testValues);
 
         // Fantastic.  Now that we have a location, add some weather!
         ContentValues weatherValues = createWeatherValues(locationRowId);
 
-        long weatherRowId = db.insert(WeatherEntry.TABLE_NAME, null, weatherValues);
-        assertTrue(weatherRowId != -1);
+        Uri weatherInsertUri = mContext.getContentResolver()
+                .insert(WeatherEntry.CONTENT_URI, weatherValues);
+        assertTrue(weatherInsertUri != null);
 
         // A cursor is your primary interface to the query results.
-        Cursor weatherCursor = db.query(
-                WeatherEntry.TABLE_NAME,  // Table to Query
+        Cursor weatherCursor = mContext.getContentResolver().query(
+                WeatherEntry.CONTENT_URI,  // Table to Query
                 null, // leaving "columns" null just returns all the columns.
                 null, // cols for "where" clause
                 null, // values for "where" clause
-                null, // columns to group by
-                null, // columns to filter by row groups
-                null  // sort order
+                null // columns to group by
         );
 
         validateCursor(weatherCursor, weatherValues);
 
-        dbHelper.close();
+        // Add the location values in with the weather data so that we can make
+// sure that the join worked and we actually get all the values back
+        addAllContentValues(weatherValues, testValues);
+
+        weatherCursor.close();
+
+// Get the joined Weather and Location data
+        weatherCursor = mContext.getContentResolver().query(
+                WeatherEntry.buildWeatherLocation(TEST_CITY_LOCATION),
+                null, // leaving "columns" null just returns all the columns.
+                null, // cols for "where" clause
+                null, // values for "where" clause
+                null // sort order
+        );
+        TestDb.validateCursor(weatherCursor, weatherValues);
+
+// Get the joined Weather and Location data with a start date
+        weatherCursor = mContext.getContentResolver().query(
+                WeatherEntry.buildWeatherLocationWithStartDate(
+                        TEST_CITY_LOCATION, TEST_DATE),
+                null, // leaving "columns" null just returns all the columns.
+                null, // cols for "where" clause
+                null, // values for "where" clause
+                null // sort order
+        );
+        TestDb.validateCursor(weatherCursor, weatherValues);
     }
 
     static ContentValues createWeatherValues(long locationRowId) {
