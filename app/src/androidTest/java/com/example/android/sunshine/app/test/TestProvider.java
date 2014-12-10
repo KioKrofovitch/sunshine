@@ -1,4 +1,19 @@
-package com.example.sunshine;
+/*
+ * Copyright (C) 2014 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package com.example.android.sunshine.app.test;
 
 import android.annotation.TargetApi;
 import android.content.ContentUris;
@@ -9,26 +24,12 @@ import android.os.Build;
 import android.test.AndroidTestCase;
 import android.util.Log;
 
-import com.example.sunshine.data.WeatherContract.LocationEntry;
-import com.example.sunshine.data.WeatherContract.WeatherEntry;
+import com.example.android.sunshine.app.data.WeatherContract.LocationEntry;
+import com.example.android.sunshine.app.data.WeatherContract.WeatherEntry;
 
 public class TestProvider extends AndroidTestCase {
 
     public static final String LOG_TAG = TestProvider.class.getSimpleName();
-
-
-    public static final String TEST_CITY_NAME = "Denver";
-    public static final String TEST_CITY_LOCATION = "80202";
-    public static final String TEST_DATE = "20141102";
-
-    // The target api annotation is needed for the call to keySet -- we wouldn't want
-// to use this in our app, but in a test it's fine to assume a higher target.
-    @TargetApi(Build.VERSION_CODES.HONEYCOMB)
-    void addAllContentValues(ContentValues destination, ContentValues source) {
-        for (String key : source.keySet()) {
-            destination.put(key, source.getAsString(key));
-        }
-    }
 
     // brings our database to an empty state
     public void deleteAllRecords() {
@@ -63,8 +64,9 @@ public class TestProvider extends AndroidTestCase {
         assertEquals(0, cursor.getCount());
         cursor.close();
     }
+
     // Since we want each test to start with a clean slate, run deleteAllRecords
-// in setUp (called by the test runner before each test).
+    // in setUp (called by the test runner before each test).
     public void setUp() {
         deleteAllRecords();
     }
@@ -129,7 +131,7 @@ public class TestProvider extends AndroidTestCase {
 
         // Get the joined Weather and Location data
         weatherCursor = mContext.getContentResolver().query(
-                WeatherEntry.buildWeatherLocation(TEST_CITY_LOCATION),
+                WeatherEntry.buildWeatherLocation(TestDb.TEST_LOCATION),
                 null, // leaving "columns" null just returns all the columns.
                 null, // cols for "where" clause
                 null, // values for "where" clause
@@ -137,25 +139,26 @@ public class TestProvider extends AndroidTestCase {
         );
         TestDb.validateCursor(weatherCursor, weatherValues);
 
-//        // Get the joined Weather and Location data with a start date
-//        weatherCursor = mContext.getContentResolver().query(
-//                WeatherEntry.buildWeatherLocationWithStartDate(TEST_CITY_LOCATION, TEST_DATE),
-//                null, // leaving "columns" null just returns all the columns.
-//                null, // cols for "where" clause
-//                null, // values for "where" clause
-//                null  // sort order
-//        );
-//        TestDb.validateCursor(weatherCursor, weatherValues);
-//
-//        // Get the joined Weather data for a specific date
-//        weatherCursor = mContext.getContentResolver().query(
-//                WeatherEntry.buildWeatherLocationWithDate(TEST_CITY_LOCATION, TEST_DATE),
-//                null,
-//                null,
-//                null,
-//                null
-//        );
-//        TestDb.validateCursor(weatherCursor, weatherValues);
+        // Get the joined Weather and Location data with a start date
+        weatherCursor = mContext.getContentResolver().query(
+                WeatherEntry.buildWeatherLocationWithStartDate(
+                        TestDb.TEST_LOCATION, TestDb.TEST_DATE),
+                null, // leaving "columns" null just returns all the columns.
+                null, // cols for "where" clause
+                null, // values for "where" clause
+                null  // sort order
+        );
+        TestDb.validateCursor(weatherCursor, weatherValues);
+
+        // Get the joined Weather data for a specific date
+        weatherCursor = mContext.getContentResolver().query(
+                WeatherEntry.buildWeatherLocationWithDate(TestDb.TEST_LOCATION, TestDb.TEST_DATE),
+                null,
+                null,
+                null,
+                null
+        );
+        TestDb.validateCursor(weatherCursor, weatherValues);
     }
 
     public void testGetType() {
@@ -221,12 +224,21 @@ public class TestProvider extends AndroidTestCase {
         );
 
         TestDb.validateCursor(cursor, updatedValues);
-        cursor.close();
     }
 
     // Make sure we can still delete after adding/updating stuff
     public void testDeleteRecordsAtEnd() {
         deleteAllRecords();
+    }
+
+
+    // The target api annotation is needed for the call to keySet -- we wouldn't want
+    // to use this in our app, but in a test it's fine to assume a higher target.
+    @TargetApi(Build.VERSION_CODES.HONEYCOMB)
+    void addAllContentValues(ContentValues destination, ContentValues source) {
+        for (String key : source.keySet()) {
+            destination.put(key, source.getAsString(key));
+        }
     }
 
     static final String KALAMAZOO_LOCATION_SETTING = "kalamazoo";
@@ -302,9 +314,9 @@ public class TestProvider extends AndroidTestCase {
         kalamazooAltered.put(WeatherEntry.COLUMN_SHORT_DESC, newDescription);
 
         TestDb.validateCursor(weatherCursor, kalamazooAltered);
-        weatherCursor.close();
     }
 
+    // TODO: KIO
 //    public void testRemoveHumidityAndReadWeather() {
 //        insertKalamazooData();
 //
